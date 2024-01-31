@@ -66,9 +66,6 @@ func concurrent() {
 	var wg sync.WaitGroup
 
 	processor := func(id int) {
-		defer func() {
-			wqdone <- true
-		}()
 		defer wg.Done()
 
 		localCount := int64(0)
@@ -98,16 +95,18 @@ func concurrent() {
 	for i := 0; i < numCpu; i++ {
 		wg.Add(1)
 		go func(i int) {
-			defer wg.Done()
 			processor(i)
 		}(i)
 	}
 
+	// Create a goroutine to wait for all processors to finish and then close wqdone
+	go func() {
+		wg.Wait()
+		close(wqdone)
+	}()
+
 	wq <- string(lines)
 	close(wq)
-
-	wg.Wait()
-	close(wqdone)
 
 	// Ensure all goroutines have finished processing before printing the count
 	<-wqdone
